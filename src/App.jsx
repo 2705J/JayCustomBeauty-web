@@ -1,5 +1,31 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "./supabaseClient.js";
+import emailjs from "@emailjs/browser";
+
+// Datos de conexión de EmailJS (públicos, es seguro tenerlos aquí)
+const EMAILJS_PUBLIC_KEY = "dBz5-qPnGZEzQlImV";
+const EMAILJS_SERVICE_ID = "service_8jxuf4t";
+const EMAILJS_TEMPLATE_CONFIRMACION = "template_sf71g6n";
+
+async function sendConfirmationEmail(appointment, profile) {
+  try {
+    await emailjs.send(
+      EMAILJS_SERVICE_ID,
+      EMAILJS_TEMPLATE_CONFIRMACION,
+      {
+        to_email: appointment.email,
+        to_name: appointment.name,
+        service: appointment.serviceName,
+        date: formatDateHuman(appointment.date),
+        time: appointment.time,
+        rules: profile.rules || "Por favor, avisa con 24h de antelación si necesitas cancelar.",
+      },
+      { publicKey: EMAILJS_PUBLIC_KEY }
+    );
+  } catch (e) {
+    console.error("Error enviando el correo de confirmación", e);
+  }
+}
 import {
   Sparkles, Clock, Check, X, Plus, Trash2, Image as ImageIcon, Lock, ArrowLeft,
   Star, Ban, LayoutGrid, CalendarDays, ClipboardList, Wand2, Wallet, Store, MessageSquareHeart, Menu, ChevronDown, HelpCircle
@@ -43,6 +69,7 @@ const DEFAULT_PROFILE = {
   email: "",
   aboutPhoto: null,
   aboutText: "",
+  rules: "",
 };
 
 const SLOT_MINUTES = 45;
@@ -921,9 +948,12 @@ function AgendaTab({ appointments }) {
   );
 }
 
-function ReservasTab({ appointments, setAppointments }) {
+function ReservasTab({ appointments, setAppointments, profile }) {
   const pending = appointments.filter((a) => a.status === "pendiente");
-  const decide = (id, status) => setAppointments(appointments.map((a) => (a.id === id ? { ...a, status } : a)));
+  const decide = (appt, status) => {
+    setAppointments(appointments.map((a) => (a.id === appt.id ? { ...a, status } : a)));
+    if (status === "aceptada") sendConfirmationEmail(appt, profile);
+  };
   return (
     <div>
       <h3 className="display-font text-base mb-5" style={{ color: COLORS.ink }}>Reservas pendientes</h3>
@@ -937,8 +967,8 @@ function ReservasTab({ appointments, setAppointments }) {
               <p className="text-xs" style={{ color: COLORS.muted }}>{a.email} {a.phone && `· ${a.phone}`}</p>
             </div>
             <div className="flex gap-2">
-              <button onClick={() => decide(a.id, "aceptada")} className="p-2 rounded-full" style={{ background: COLORS.ink, color: "#FFF" }}><Check size={16} /></button>
-              <button onClick={() => decide(a.id, "rechazada")} className="p-2 rounded-full" style={{ background: COLORS.soft, color: COLORS.accentDark }}><X size={16} /></button>
+              <button onClick={() => decide(a, "aceptada")} className="p-2 rounded-full" style={{ background: COLORS.ink, color: "#FFF" }}><Check size={16} /></button>
+              <button onClick={() => decide(a, "rechazada")} className="p-2 rounded-full" style={{ background: COLORS.soft, color: COLORS.accentDark }}><X size={16} /></button>
             </div>
           </div>
         ))}
@@ -1114,6 +1144,9 @@ function SalonTab({ profile, setProfile }) {
           <Field label="Teléfono"><input value={local.phone || ""} onChange={(e) => setLocal({ ...local, phone: e.target.value })} className="jcb-input" /></Field>
         </div>
         <Field label="Correo de contacto"><input type="email" value={local.email || ""} onChange={(e) => setLocal({ ...local, email: e.target.value })} className="jcb-input" /></Field>
+        <Field label="Normas del establecimiento y forma de pago (aparece en el correo de confirmación)">
+          <textarea value={local.rules || ""} onChange={(e) => setLocal({ ...local, rules: e.target.value })} className="jcb-input" rows={4} placeholder="Ej: Pago en efectivo o Bizum. Si llegas más de 15 min tarde, puede que tengamos que reprogramar." />
+        </Field>
         <div>
           <span className="text-xs uppercase tracking-wide mb-2 block" style={{ color: COLORS.muted }}>Fotos de tus sistemas</span>
           <div className="flex flex-wrap gap-2 mb-3">
