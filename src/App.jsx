@@ -44,13 +44,13 @@ const DEFAULT_SERVICES = [
 ];
 
 const DEFAULT_AVAILABILITY = {
-  1: { enabled: true, start: "10:00", end: "18:00" },
-  2: { enabled: true, start: "10:00", end: "18:00" },
-  3: { enabled: true, start: "10:00", end: "18:00" },
-  4: { enabled: true, start: "10:00", end: "18:00" },
-  5: { enabled: true, start: "10:00", end: "18:00" },
-  0: { enabled: false, start: "10:00", end: "14:00" },
-  6: { enabled: false, start: "10:00", end: "14:00" },
+  1: { enabled: true, times: ["10:00", "12:00", "16:00", "18:00"] },
+  2: { enabled: true, times: ["10:00", "12:00", "16:00", "18:00"] },
+  3: { enabled: true, times: ["10:00", "12:00", "16:00", "18:00"] },
+  4: { enabled: true, times: ["10:00", "12:00", "16:00", "18:00"] },
+  5: { enabled: true, times: ["10:00", "12:00", "16:00", "18:00"] },
+  0: { enabled: false, times: [] },
+  6: { enabled: false, times: ["10:00"] },
 };
 
 const DEMO_NAIL_PHOTOS = [
@@ -189,15 +189,8 @@ export default function App() {
     const day = new Date(dateStr + "T00:00:00").getDay();
     const conf = availability[day];
     if (!conf || !conf.enabled) return [];
-    const startM = timeToMinutes(conf.start);
-    const endM = timeToMinutes(conf.end);
     const taken = takenSlots(dateStr);
-    const slots = [];
-    for (let m = startM; m + SLOT_MINUTES <= endM; m += SLOT_MINUTES) {
-      const t = minutesToTime(m);
-      if (!taken.includes(t)) slots.push(t);
-    }
-    return slots;
+    return (conf.times || []).filter((t) => !taken.includes(t)).sort();
   };
 
   if (!loaded) {
@@ -1005,26 +998,56 @@ function IngresosTab({ appointments, services }) {
 }
 
 function HorariosTab({ availability, setAvailability }) {
+  const [newTime, setNewTime] = useState({});
   const update = (day, patch) => setAvailability({ ...availability, [day]: { ...availability[day], ...patch } });
+
+  const addTime = (day) => {
+    const t = newTime[day];
+    if (!t) return;
+    const conf = availability[day] || { enabled: true, times: [] };
+    if (conf.times.includes(t)) return;
+    update(day, { times: [...conf.times, t].sort() });
+    setNewTime({ ...newTime, [day]: "" });
+  };
+  const removeTime = (day, t) => {
+    const conf = availability[day] || { enabled: true, times: [] };
+    update(day, { times: conf.times.filter((x) => x !== t) });
+  };
+
   return (
     <div>
-      <h3 className="display-font text-base mb-5" style={{ color: COLORS.ink }}>Horario semanal</h3>
-      <div className="space-y-2">
+      <h3 className="display-font text-base mb-2" style={{ color: COLORS.ink }}>Horario semanal</h3>
+      <p className="text-xs mb-5" style={{ color: COLORS.muted }}>Marca los días que trabajas y añade las horas concretas en las que puedes atender ese día. Solo esas horas aparecerán disponibles para reservar.</p>
+      <div className="space-y-3">
         {DAY_NAMES.map((name, idx) => {
-          const conf = availability[idx] || { enabled: false, start: "10:00", end: "18:00" };
+          const conf = availability[idx] || { enabled: false, times: [] };
           return (
-            <div key={idx} className="flex items-center gap-3 p-3 rounded-xl" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
-              <button onClick={() => update(idx, { enabled: !conf.enabled })} className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
-                style={{ background: conf.enabled ? COLORS.ink : COLORS.soft, color: conf.enabled ? "#FFF" : COLORS.accentDark }}>
-                {DAY_SHORT[idx]}
-              </button>
-              <span className="w-24 text-sm">{name}</span>
+            <div key={idx} className="p-3 rounded-xl" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+              <div className="flex items-center gap-3 mb-2">
+                <button onClick={() => update(idx, { enabled: !conf.enabled })} className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+                  style={{ background: conf.enabled ? COLORS.ink : COLORS.soft, color: conf.enabled ? "#FFF" : COLORS.accentDark }}>
+                  {DAY_SHORT[idx]}
+                </button>
+                <span className="text-sm font-medium">{name}</span>
+              </div>
               {conf.enabled && (
-                <>
-                  <input type="time" value={conf.start} onChange={(e) => update(idx, { start: e.target.value })} className="jcb-mini-input" />
-                  <span style={{ color: COLORS.muted }}>—</span>
-                  <input type="time" value={conf.end} onChange={(e) => update(idx, { end: e.target.value })} className="jcb-mini-input" />
-                </>
+                <div className="pl-11">
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {(conf.times || []).sort().map((t) => (
+                      <span key={t} className="text-xs px-3 py-1 rounded-full flex items-center gap-2" style={{ background: COLORS.soft, color: COLORS.accentDark }}>
+                        {t}
+                        <button onClick={() => removeTime(idx, t)}><X size={11} /></button>
+                      </span>
+                    ))}
+                    {(!conf.times || conf.times.length === 0) && <span className="text-xs italic" style={{ color: COLORS.muted }}>Sin horas añadidas todavía</span>}
+                  </div>
+                  <div className="flex gap-2">
+                    <input type="time" value={newTime[idx] || ""} onChange={(e) => setNewTime({ ...newTime, [idx]: e.target.value })} className="jcb-mini-input" />
+                    <button onClick={() => addTime(idx)} className="px-3 py-1 rounded-lg text-xs flex items-center gap-1" style={{ background: COLORS.ink, color: "#FFF" }}>
+                      <Plus size={12} /> Añadir
+                    </button>
+                  </div>
+                </div>
               )}
             </div>
           );
