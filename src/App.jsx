@@ -36,12 +36,14 @@ const DAY_SHORT = ["D", "L", "M", "X", "J", "V", "S"];
 const MONTH_NAMES = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
 
 const DEFAULT_SERVICES = [
-  { id: "s1", name: "Acrílico S/M", size: "S/M", price: 25, duration: 60, description: "Precio base para diseños sencillos o poca decoración.", photo: null },
-  { id: "s2", name: "Acrílico M-L/L", size: "M-L/L", price: 30, duration: 75, description: "Precio base para diseños sencillos o poca decoración.", photo: null },
-  { id: "s3", name: "Acrílico L/XL", size: "L/XL", price: 40, duration: 90, description: "Máximo largo, diseño a medida.", photo: null },
-  { id: "s4", name: "Semipermanente", size: null, price: 20, duration: 45, description: "Manicura semipermanente con acabado duradero.", photo: null },
-  { id: "s5", name: "Nivelación Ruber", size: null, price: 22, duration: 60, description: "Nivelación con ruber para una base perfecta.", photo: null },
+  { id: "s1", name: "Acrílico S/M", size: "S/M", price: 25, duration: 60, description: "Precio base para diseños sencillos o poca decoración.", photo: null, category: "Manicura" },
+  { id: "s2", name: "Acrílico M-L/L", size: "M-L/L", price: 30, duration: 75, description: "Precio base para diseños sencillos o poca decoración.", photo: null, category: "Manicura" },
+  { id: "s3", name: "Acrílico L/XL", size: "L/XL", price: 40, duration: 90, description: "Máximo largo, diseño a medida.", photo: null, category: "Manicura" },
+  { id: "s4", name: "Semipermanente", size: null, price: 20, duration: 45, description: "Manicura semipermanente con acabado duradero.", photo: null, category: "Manicura" },
+  { id: "s5", name: "Nivelación Ruber", size: null, price: 22, duration: 60, description: "Nivelación con ruber para una base perfecta.", photo: null, category: "Manicura" },
 ];
+
+const SERVICE_CATEGORIES = ["Manicura", "Pedicura", "Otros"];
 
 const DEFAULT_AVAILABILITY = {
   1: { enabled: true, times: ["10:00", "12:00", "16:00", "18:00"] },
@@ -496,23 +498,32 @@ function ClientView({ profile, services, reviews, faqs, onSubmit, onGiftCardRequ
         <div className="max-w-2xl mx-auto px-6 pt-10 pb-20">
           <BackButton onClick={() => setMode("menu")} />
           <h2 className="display-font text-xl mb-6" style={{ color: COLORS.ink }}>Servicios</h2>
-          <div className="grid grid-cols-2 gap-3">
-            {services.map((s) => (
-              <button key={s.id} onClick={() => setViewingService(s)} className="text-left rounded-2xl overflow-hidden transition"
-                style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
-                {s.photo ? (
-                  <img src={s.photo} alt={s.name} className="w-full h-32 object-cover" />
-                ) : (
-                  <div className="w-full h-32 flex items-center justify-center" style={{ background: COLORS.soft }}>
-                    <Sparkles size={20} color={COLORS.accentSoft} />
-                  </div>
-                )}
-                <div className="p-3">
-                  <div className="service-title text-sm">{s.name}</div>
+          {SERVICE_CATEGORIES.map((cat) => {
+            const items = services.filter((s) => (s.category || "Manicura") === cat);
+            if (items.length === 0) return null;
+            return (
+              <div key={cat} className="mb-8">
+                <p className="text-xs uppercase tracking-widest mb-3" style={{ color: COLORS.accentSoft, fontWeight: 600 }}>{cat}</p>
+                <div className="grid grid-cols-2 gap-3">
+                  {items.map((s) => (
+                    <button key={s.id} onClick={() => setViewingService(s)} className="text-left rounded-2xl overflow-hidden transition"
+                      style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+                      {s.photo ? (
+                        <img src={s.photo} alt={s.name} className="w-full h-32 object-cover" />
+                      ) : (
+                        <div className="w-full h-32 flex items-center justify-center" style={{ background: COLORS.soft }}>
+                          <Sparkles size={20} color={COLORS.accentSoft} />
+                        </div>
+                      )}
+                      <div className="p-3">
+                        <div className="service-title text-sm">{s.name}</div>
+                      </div>
+                    </button>
+                  ))}
                 </div>
-              </button>
-            ))}
-          </div>
+              </div>
+            );
+          })}
 
           {viewingService && (
             <div className="fixed inset-0 flex items-center justify-center p-6 z-50" style={{ background: "rgba(36,16,20,0.45)" }} onClick={() => setViewingService(null)}>
@@ -634,29 +645,40 @@ function BookingFlow({ services, slotsForDate, onSubmit }) {
       <p className="mb-8 text-xs italic" style={{ color: COLORS.muted }}>Los precios son de partida para diseños sencillos; el precio final puede variar según el diseño elegido.</p>
 
       {!selectedService && (
-        <div className="space-y-5 mb-8">
-          {services.map((s) => (
-            <div key={s.id} className="rounded-2xl overflow-hidden" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
-              {s.photo ? (
-                <img src={s.photo} alt={s.name} className="w-full h-48 object-cover" />
-              ) : (
-                <div className="w-full h-48 flex items-center justify-center" style={{ background: COLORS.soft }}>
-                  <Sparkles size={22} color={COLORS.accentSoft} />
+        <div className="mb-8">
+          {SERVICE_CATEGORIES.map((cat) => {
+            const items = services.filter((s) => (s.category || "Manicura") === cat);
+            if (items.length === 0) return null;
+            return (
+              <div key={cat} className="mb-8">
+                <p className="text-xs uppercase tracking-widest mb-3" style={{ color: COLORS.accentSoft, fontWeight: 600 }}>{cat}</p>
+                <div className="space-y-5">
+                  {items.map((s) => (
+                    <div key={s.id} className="rounded-2xl overflow-hidden" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+                      {s.photo ? (
+                        <img src={s.photo} alt={s.name} className="w-full h-48 object-cover" />
+                      ) : (
+                        <div className="w-full h-48 flex items-center justify-center" style={{ background: COLORS.soft }}>
+                          <Sparkles size={22} color={COLORS.accentSoft} />
+                        </div>
+                      )}
+                      <div className="p-5">
+                        <h3 className="service-title text-base mb-2" style={{ color: COLORS.ink }}>{s.name}</h3>
+                        <p className="text-sm" style={{ color: COLORS.muted }}>{s.description}</p>
+                        <div className="flex items-center gap-4 mt-4 text-sm" style={{ color: COLORS.ink }}>
+                          <span className="flex items-center gap-1"><Clock size={14} color={COLORS.muted} /> {formatDuration(s.duration)}</span>
+                          <span style={{ color: COLORS.accentSoft, fontWeight: 600 }}>Desde {s.price} €</span>
+                        </div>
+                        <button onClick={() => setSelectedService(s)} className="mt-4 text-sm font-medium flex items-center gap-1" style={{ color: COLORS.accentSoft }}>
+                          Reservar este servicio →
+                        </button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              )}
-              <div className="p-5">
-                <h3 className="service-title text-base mb-2" style={{ color: COLORS.ink }}>{s.name}</h3>
-                <p className="text-sm" style={{ color: COLORS.muted }}>{s.description}</p>
-                <div className="flex items-center gap-4 mt-4 text-sm" style={{ color: COLORS.ink }}>
-                  <span className="flex items-center gap-1"><Clock size={14} color={COLORS.muted} /> {formatDuration(s.duration)}</span>
-                  <span style={{ color: COLORS.accentSoft, fontWeight: 600 }}>Desde {s.price} €</span>
-                </div>
-                <button onClick={() => setSelectedService(s)} className="mt-4 text-sm font-medium flex items-center gap-1" style={{ color: COLORS.accentSoft }}>
-                  Reservar este servicio →
-                </button>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -1284,7 +1306,7 @@ function FaqTab({ faqs, setFaqs }) {
 
 function ServicesTab({ services, setServices }) {
   const [editing, setEditing] = useState(null);
-  const blank = { id: "", name: "", size: "", price: "", duration: 60, description: "", photo: null };
+  const blank = { id: "", name: "", size: "", price: "", duration: 60, description: "", photo: null, category: SERVICE_CATEGORIES[0] };
 
   const save = (svc) => {
     if (svc.id) setServices(services.map((s) => (s.id === svc.id ? svc : s)));
@@ -1294,6 +1316,9 @@ function ServicesTab({ services, setServices }) {
   const remove = (id) => setServices(services.filter((s) => s.id !== id));
   const handlePhoto = (file, cb) => { const reader = new FileReader(); reader.onload = () => cb(reader.result); reader.readAsDataURL(file); };
 
+  const grouped = SERVICE_CATEGORIES.map((cat) => ({ cat, items: services.filter((s) => (s.category || "Manicura") === cat) })).filter((g) => g.items.length > 0);
+  const uncategorized = services.filter((s) => !SERVICE_CATEGORIES.includes(s.category || "Manicura"));
+
   return (
     <div>
       <div className="flex justify-between items-center mb-5">
@@ -1302,20 +1327,42 @@ function ServicesTab({ services, setServices }) {
           <Plus size={14} /> Añadir
         </button>
       </div>
-      <div className="grid md:grid-cols-2 gap-3">
-        {services.map((s) => (
-          <div key={s.id} className="p-4 rounded-xl" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
-            {s.photo && <img src={s.photo} alt={s.name} className="w-full h-28 object-cover rounded-lg mb-2" />}
-            <p className="service-title text-sm">{s.name}</p>
-            <p className="text-sm" style={{ color: COLORS.muted }}>{s.description}</p>
-            <p className="text-sm mt-1" style={{ color: COLORS.accentSoft }}>Desde {s.price}€ · {s.duration} min</p>
-            <div className="flex gap-3 mt-2">
-              <button onClick={() => setEditing(s)} className="text-xs underline" style={{ color: COLORS.ink }}>Editar</button>
-              <button onClick={() => remove(s.id)} className="text-xs underline flex items-center gap-1" style={{ color: COLORS.muted }}><Trash2 size={11} /> Eliminar</button>
-            </div>
+
+      {grouped.map(({ cat, items }) => (
+        <div key={cat} className="mb-6">
+          <p className="text-xs uppercase tracking-widest mb-2" style={{ color: COLORS.accentSoft, fontWeight: 600 }}>{cat}</p>
+          <div className="grid md:grid-cols-2 gap-3">
+            {items.map((s) => (
+              <div key={s.id} className="p-4 rounded-xl" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+                {s.photo && <img src={s.photo} alt={s.name} className="w-full h-28 object-cover rounded-lg mb-2" />}
+                <p className="service-title text-sm">{s.name}</p>
+                <p className="text-sm" style={{ color: COLORS.muted }}>{s.description}</p>
+                <p className="text-sm mt-1" style={{ color: COLORS.accentSoft }}>Desde {s.price}€ · {s.duration} min</p>
+                <div className="flex gap-3 mt-2">
+                  <button onClick={() => setEditing(s)} className="text-xs underline" style={{ color: COLORS.ink }}>Editar</button>
+                  <button onClick={() => remove(s.id)} className="text-xs underline flex items-center gap-1" style={{ color: COLORS.muted }}><Trash2 size={11} /> Eliminar</button>
+                </div>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
+        </div>
+      ))}
+      {uncategorized.length > 0 && (
+        <div className="grid md:grid-cols-2 gap-3">
+          {uncategorized.map((s) => (
+            <div key={s.id} className="p-4 rounded-xl" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+              {s.photo && <img src={s.photo} alt={s.name} className="w-full h-28 object-cover rounded-lg mb-2" />}
+              <p className="service-title text-sm">{s.name}</p>
+              <p className="text-sm" style={{ color: COLORS.muted }}>{s.description}</p>
+              <p className="text-sm mt-1" style={{ color: COLORS.accentSoft }}>Desde {s.price}€ · {s.duration} min</p>
+              <div className="flex gap-3 mt-2">
+                <button onClick={() => setEditing(s)} className="text-xs underline" style={{ color: COLORS.ink }}>Editar</button>
+                <button onClick={() => remove(s.id)} className="text-xs underline flex items-center gap-1" style={{ color: COLORS.muted }}><Trash2 size={11} /> Eliminar</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {editing && (
         <div className="fixed inset-0 flex items-center justify-center p-6 z-50" style={{ background: "rgba(36,16,20,0.45)" }}>
@@ -1323,6 +1370,12 @@ function ServicesTab({ services, setServices }) {
             <h4 className="display-font text-base mb-4">{editing.id ? "Editar servicio" : "Nuevo servicio"}</h4>
             <div className="space-y-3">
               <input placeholder="Nombre" value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} className="jcb-input" />
+              <div>
+                <span className="text-xs uppercase tracking-wide mb-1 block" style={{ color: COLORS.muted }}>Categoría</span>
+                <select value={editing.category || SERVICE_CATEGORIES[0]} onChange={(e) => setEditing({ ...editing, category: e.target.value })} className="jcb-input">
+                  {SERVICE_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
               <div className="grid grid-cols-2 gap-3">
                 <input placeholder="Precio desde (€)" type="number" value={editing.price} onChange={(e) => setEditing({ ...editing, price: Number(e.target.value) })} className="jcb-input" />
                 <input placeholder="Duración (min)" type="number" value={editing.duration} onChange={(e) => setEditing({ ...editing, duration: Number(e.target.value) })} className="jcb-input" />
