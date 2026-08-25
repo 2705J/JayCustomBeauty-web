@@ -99,7 +99,7 @@ function useFonts() {
     const link = document.createElement("link");
     link.id = id;
     link.rel = "stylesheet";
-    link.href = "https://fonts.googleapis.com/css2?family=Unbounded:wght@400;600;800&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,400&family=Work+Sans:wght@400;500;600&display=swap";
+    link.href = "https://fonts.googleapis.com/css2?family=Unbounded:wght@400;600;800&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,400&family=Work+Sans:wght@400;500;600&family=Caveat:wght@600;700&display=swap";
     document.head.appendChild(link);
   }, []);
 }
@@ -205,7 +205,7 @@ export default function App() {
     <div className="min-h-screen" style={{ background: COLORS.bg, fontFamily: "'Work Sans', sans-serif", color: COLORS.ink }}>
       <style>{`
         .display-font { font-family: 'Unbounded', sans-serif; }
-        .service-title { font-family: 'Unbounded', sans-serif; font-weight: 800; text-transform: uppercase; letter-spacing: 0.03em; }
+        .service-title { font-family: 'Caveat', cursive; font-weight: 700; letter-spacing: 0.01em; font-size: 1.4em; }
         .hero-font { font-family: 'Cormorant Garamond', serif; font-weight: 400; }
         .jcb-input { width: 100%; padding: 10px 14px; border-radius: 12px; border: 1px solid ${COLORS.border}; background: #FFFFFF; color: ${COLORS.ink}; outline: none; }
         .jcb-input:focus { border-color: ${COLORS.accent}; }
