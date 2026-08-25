@@ -183,7 +183,19 @@ export default function App() {
   const persistGiftCards = async (next) => { setGiftCards(next); await storageSet("jcb:giftCards", next, true); };
   const persistFaqs = async (next) => { setFaqs(next); await storageSet("jcb:faqs", next, true); };
 
-  const takenSlots = (dateStr) => appointments.filter((a) => a.date === dateStr && a.status !== "rechazada").map((a) => a.time);
+  const appointmentDuration = (a) => {
+    if (a.totalDuration) return a.totalDuration;
+    const svc = services.find((s) => s.id === a.serviceId);
+    return svc?.duration || 60;
+  };
+
+  const blockedRanges = (dateStr) =>
+    appointments
+      .filter((a) => a.date === dateStr && a.status !== "rechazada")
+      .map((a) => {
+        const start = timeToMinutes(a.time);
+        return { start, end: start + appointmentDuration(a) };
+      });
 
   const slotsForDate = (dateStr) => {
     if (!dateStr) return [];
@@ -191,8 +203,13 @@ export default function App() {
     const day = new Date(dateStr + "T00:00:00").getDay();
     const conf = availability[day];
     if (!conf || !conf.enabled) return [];
-    const taken = takenSlots(dateStr);
-    return (conf.times || []).filter((t) => !taken.includes(t)).sort();
+    const ranges = blockedRanges(dateStr);
+    return (conf.times || [])
+      .filter((t) => {
+        const m = timeToMinutes(t);
+        return !ranges.some((r) => m >= r.start && m < r.end);
+      })
+      .sort();
   };
 
   if (!loaded) {
@@ -499,11 +516,11 @@ function ClientView({ profile, services, reviews, faqs, onSubmit, onGiftCardRequ
           <BackButton onClick={() => setMode("menu")} />
           <h2 className="display-font text-xl mb-6" style={{ color: COLORS.ink }}>Servicios</h2>
           {SERVICE_CATEGORIES.map((cat) => {
-            const items = services.filter((s) => (s.category || "Manicura") === cat);
+            const items = services.filter((s) => (s.category || "Manicura").trim() === cat);
             if (items.length === 0) return null;
             return (
               <div key={cat} className="mb-8">
-                <p className="text-xs uppercase tracking-widest mb-3" style={{ color: COLORS.accentSoft, fontWeight: 600 }}>{cat}</p>
+                <div className="flex items-center gap-3 mb-4"><h3 className="display-font text-lg" style={{ color: COLORS.ink }}>{cat}</h3><div className="flex-1 h-px" style={{ background: COLORS.border }} /></div>
                 <div className="grid grid-cols-2 gap-3">
                   {items.map((s) => (
                     <button key={s.id} onClick={() => setViewingService(s)} className="text-left rounded-2xl overflow-hidden transition"
@@ -607,14 +624,27 @@ function BackButton({ onClick }) {
 
 function BookingFlow({ services, slotsForDate, onSubmit }) {
   const [selectedService, setSelectedService] = useState(null);
+  const [extraIds, setExtraIds] = useState([]);
   const [form, setForm] = useState({ name: "", phone: "", email: "", date: "", time: "" });
   const [sent, setSent] = useState(false);
   const slots = slotsForDate(form.date);
 
+  const extraServices = services.filter((s) => extraIds.includes(s.id));
+  const totalPrice = (selectedService?.price || 0) + extraServices.reduce((sum, s) => sum + s.price, 0);
+  const totalDuration = (selectedService?.duration || 0) + extraServices.reduce((sum, s) => sum + s.duration, 0);
+
+  const toggleExtra = (id) => setExtraIds((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
+
   const submit = (e) => {
     e.preventDefault();
     if (!selectedService || !form.name || !form.email || !form.date || !form.time) return;
-    onSubmit({ ...form, serviceId: selectedService.id, serviceName: selectedService.name });
+    onSubmit({
+      ...form,
+      serviceId: selectedService.id,
+      serviceName: extraServices.length ? `${selectedService.name} + ${extraServices.map((s) => s.name).join(" + ")}` : selectedService.name,
+      totalPrice,
+      totalDuration,
+    });
     setSent(true);
   };
 
@@ -629,7 +659,7 @@ function BookingFlow({ services, slotsForDate, onSubmit }) {
           Tu cita para el {formatDateHuman(form.date)} a las {form.time} está en revisión. Te avisaré en cuanto quede confirmada.
         </p>
         <button
-          onClick={() => { setSent(false); setSelectedService(null); setForm({ name: "", phone: "", email: "", date: "", time: "" }); }}
+          onClick={() => { setSent(false); setSelectedService(null); setExtraIds([]); setForm({ name: "", phone: "", email: "", date: "", time: "" }); }}
           className="mt-8 text-sm underline" style={{ color: COLORS.accentSoft }}
         >
           Reservar otra cita
@@ -647,11 +677,11 @@ function BookingFlow({ services, slotsForDate, onSubmit }) {
       {!selectedService && (
         <div className="mb-8">
           {SERVICE_CATEGORIES.map((cat) => {
-            const items = services.filter((s) => (s.category || "Manicura") === cat);
+            const items = services.filter((s) => (s.category || "Manicura").trim() === cat);
             if (items.length === 0) return null;
             return (
               <div key={cat} className="mb-8">
-                <p className="text-xs uppercase tracking-widest mb-3" style={{ color: COLORS.accentSoft, fontWeight: 600 }}>{cat}</p>
+                <div className="flex items-center gap-3 mb-4"><h3 className="display-font text-lg" style={{ color: COLORS.ink }}>{cat}</h3><div className="flex-1 h-px" style={{ background: COLORS.border }} /></div>
                 <div className="space-y-5">
                   {items.map((s) => (
                     <div key={s.id} className="rounded-2xl overflow-hidden" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
@@ -690,8 +720,31 @@ function BookingFlow({ services, slotsForDate, onSubmit }) {
               <p className="service-title text-sm" style={{ color: COLORS.ink }}>{selectedService.name}</p>
               <p className="text-xs" style={{ color: COLORS.accentSoft }}>Desde {selectedService.price} € · {formatDuration(selectedService.duration)}</p>
             </div>
-            <button onClick={() => setSelectedService(null)} className="text-xs underline flex-shrink-0" style={{ color: COLORS.muted }}>Cambiar</button>
+            <button onClick={() => { setSelectedService(null); setExtraIds([]); }} className="text-xs underline flex-shrink-0" style={{ color: COLORS.muted }}>Cambiar</button>
           </div>
+        </div>
+      )}
+
+      {selectedService && services.length > 1 && (
+        <div className="mb-8">
+          <p className="text-sm font-medium mb-1" style={{ color: COLORS.ink }}>¿Quieres añadir algo más a tu cita?</p>
+          <p className="text-xs mb-3" style={{ color: COLORS.muted }}>Por ejemplo, una pedicura junto con tu manicura.</p>
+          <div className="space-y-2">
+            {services.filter((s) => s.id !== selectedService.id).map((s) => (
+              <label key={s.id} className="flex items-center gap-3 p-3 rounded-xl cursor-pointer" style={{ background: COLORS.card, border: `1px solid ${extraIds.includes(s.id) ? COLORS.accentSoft : COLORS.border}` }}>
+                <input type="checkbox" checked={extraIds.includes(s.id)} onChange={() => toggleExtra(s.id)} className="flex-shrink-0" />
+                <div className="flex-1">
+                  <span className="service-title text-sm">{s.name}</span>
+                  <span className="text-xs block" style={{ color: COLORS.muted }}>+{s.price} € · +{formatDuration(s.duration)}</span>
+                </div>
+              </label>
+            ))}
+          </div>
+          {extraIds.length > 0 && (
+            <p className="text-sm mt-3" style={{ color: COLORS.ink }}>
+              Total: <span style={{ color: COLORS.accentSoft, fontWeight: 600 }}>{totalPrice} €</span> · {formatDuration(totalDuration)} aprox.
+            </p>
+          )}
         </div>
       )}
 
@@ -921,7 +974,7 @@ function ResumenTab({ appointments, reviews, services }) {
   const approved = appointments.filter((a) => a.status === "aceptada");
   const thisMonth = monthKey(new Date().toISOString().slice(0, 10));
   const monthTotal = approved.filter((a) => monthKey(a.date) === thisMonth)
-    .reduce((sum, a) => sum + (services.find((s) => s.id === a.serviceId)?.price || 0), 0);
+    .reduce((sum, a) => sum + (a.totalPrice ?? services.find((s) => s.id === a.serviceId)?.price ?? 0), 0);
   const avgRating = reviews.length ? (reviews.reduce((a, r) => a + r.rating, 0) / reviews.length).toFixed(1) : "—";
 
   return (
@@ -996,7 +1049,7 @@ function IngresosTab({ appointments, services }) {
   const approved = appointments.filter((a) => a.status === "aceptada");
   const byMonth = approved.reduce((acc, a) => {
     const k = monthKey(a.date);
-    const price = services.find((s) => s.id === a.serviceId)?.price || 0;
+    const price = a.totalPrice ?? services.find((s) => s.id === a.serviceId)?.price ?? 0;
     acc[k] = (acc[k] || 0) + price;
     return acc;
   }, {});
@@ -1316,8 +1369,8 @@ function ServicesTab({ services, setServices }) {
   const remove = (id) => setServices(services.filter((s) => s.id !== id));
   const handlePhoto = (file, cb) => { const reader = new FileReader(); reader.onload = () => cb(reader.result); reader.readAsDataURL(file); };
 
-  const grouped = SERVICE_CATEGORIES.map((cat) => ({ cat, items: services.filter((s) => (s.category || "Manicura") === cat) })).filter((g) => g.items.length > 0);
-  const uncategorized = services.filter((s) => !SERVICE_CATEGORIES.includes(s.category || "Manicura"));
+  const grouped = SERVICE_CATEGORIES.map((cat) => ({ cat, items: services.filter((s) => (s.category || "Manicura").trim() === cat) })).filter((g) => g.items.length > 0);
+  const uncategorized = services.filter((s) => !SERVICE_CATEGORIES.includes((s.category || "Manicura").trim()));
 
   return (
     <div>
@@ -1330,7 +1383,7 @@ function ServicesTab({ services, setServices }) {
 
       {grouped.map(({ cat, items }) => (
         <div key={cat} className="mb-6">
-          <p className="text-xs uppercase tracking-widest mb-2" style={{ color: COLORS.accentSoft, fontWeight: 600 }}>{cat}</p>
+          <div className="flex items-center gap-3 mb-3"><h4 className="display-font text-base" style={{ color: COLORS.ink }}>{cat}</h4><div className="flex-1 h-px" style={{ background: COLORS.border }} /></div>
           <div className="grid md:grid-cols-2 gap-3">
             {items.map((s) => (
               <div key={s.id} className="p-4 rounded-xl" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
