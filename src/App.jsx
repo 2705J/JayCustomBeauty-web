@@ -6,6 +6,7 @@ import emailjs from "@emailjs/browser";
 const EMAILJS_PUBLIC_KEY = "dBz5-qPnGZEzQlImV";
 const EMAILJS_SERVICE_ID = "service_8jxuf4t";
 const EMAILJS_TEMPLATE_CONFIRMACION = "template_sf71g6n";
+const EMAILJS_TEMPLATE_CANCELACION = "template_hdzaor4";
 
 async function sendConfirmationEmail(appointment, profile) {
   try {
@@ -24,6 +25,25 @@ async function sendConfirmationEmail(appointment, profile) {
     );
   } catch (e) {
     console.error("Error enviando el correo de confirmación", e);
+  }
+}
+
+async function sendCancellationEmail(appointment) {
+  try {
+    await emailjs.send(
+      EMAILJS_SERVICE_ID,
+      EMAILJS_TEMPLATE_CANCELACION,
+      {
+        to_email: appointment.email,
+        to_name: appointment.name,
+        service: appointment.serviceName,
+        date: formatDateHuman(appointment.date),
+        time: appointment.time,
+      },
+      { publicKey: EMAILJS_PUBLIC_KEY }
+    );
+  } catch (e) {
+    console.error("Error enviando el correo de cancelación", e);
   }
 }
 import {
@@ -983,25 +1003,93 @@ function ResumenTab({ appointments, reviews, services }) {
   );
 }
 
-function AgendaTab({ appointments }) {
-  const approved = appointments.filter((a) => a.status === "aceptada").sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
-  const byDate = approved.reduce((acc, a) => { (acc[a.date] = acc[a.date] || []).push(a); return acc; }, {});
+const MONTH_LABELS = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+const WEEKDAY_LABELS = ["L","M","X","J","V","S","D"];
+
+function AgendaTab({ appointments, setAppointments }) {
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const [monthCursor, setMonthCursor] = useState(() => { const d = new Date(); d.setDate(1); return d; });
+  const [selectedDay, setSelectedDay] = useState(todayStr);
+
+  const approved = appointments.filter((a) => a.status === "aceptada");
+  const countsByDate = approved.reduce((acc, a) => { acc[a.date] = (acc[a.date] || 0) + 1; return acc; }, {});
+
+  const cancelAppointment = (appt) => {
+    const ok = window.confirm(`¿Seguro que quieres cancelar la cita de ${appt.name} el ${formatDateHuman(appt.date)} a las ${appt.time}? Se le avisará por correo.`);
+    if (!ok) return;
+    setAppointments(appointments.map((a) => (a.id === appt.id ? { ...a, status: "cancelada" } : a)));
+    sendCancellationEmail(appt);
+  };
+
+  const year = monthCursor.getFullYear();
+  const month = monthCursor.getMonth();
+  const firstOfMonth = new Date(year, month, 1);
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const startOffset = (firstOfMonth.getDay() + 6) % 7; // lunes = 0
+
+  const cells = [];
+  for (let i = 0; i < startOffset; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+
+  const dateStrFor = (d) => `${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+
+  const changeMonth = (delta) => {
+    const d = new Date(year, month + delta, 1);
+    setMonthCursor(d);
+  };
+
+  const dayAppointments = approved.filter((a) => a.date === selectedDay).sort((a, b) => a.time.localeCompare(b.time));
+
   return (
     <div>
       <h3 className="display-font text-base mb-5" style={{ color: COLORS.ink }}>Agenda</h3>
-      {Object.keys(byDate).length === 0 && <p className="text-sm" style={{ color: COLORS.muted }}>Aún no hay citas confirmadas.</p>}
-      <div className="space-y-4">
-        {Object.entries(byDate).map(([date, items]) => (
-          <div key={date}>
-            <p className="text-xs uppercase tracking-wide mb-2" style={{ color: COLORS.accentSoft }}>{formatDateHuman(date)}</p>
-            <div className="space-y-2">
-              {items.map((a) => (
-                <div key={a.id} className="p-3 rounded-xl text-sm flex justify-between" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
-                  <span>{a.time} · {a.name}</span>
-                  <span style={{ color: COLORS.muted }}>{a.serviceName}</span>
-                </div>
-              ))}
+
+      <div className="flex items-center justify-between mb-4">
+        <button onClick={() => changeMonth(-1)} className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: COLORS.soft, color: COLORS.accentDark }}>‹</button>
+        <p className="display-font text-base capitalize" style={{ color: COLORS.ink }}>{MONTH_LABELS[month]} {year}</p>
+        <button onClick={() => changeMonth(1)} className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: COLORS.soft, color: COLORS.accentDark }}>›</button>
+      </div>
+
+      <div className="grid grid-cols-7 gap-1 mb-1">
+        {WEEKDAY_LABELS.map((w) => (
+          <div key={w} className="text-center text-xs" style={{ color: COLORS.muted }}>{w}</div>
+        ))}
+      </div>
+      <div className="grid grid-cols-7 gap-1 mb-6">
+        {cells.map((d, i) => {
+          if (!d) return <div key={`empty-${i}`} />;
+          const dateStr = dateStrFor(d);
+          const count = countsByDate[dateStr] || 0;
+          const isToday = dateStr === todayStr;
+          const isSelected = dateStr === selectedDay;
+          return (
+            <button key={dateStr} onClick={() => setSelectedDay(dateStr)}
+              className="aspect-square rounded-xl flex flex-col items-center justify-center relative"
+              style={{
+                background: isSelected ? COLORS.ink : count > 0 ? COLORS.soft : "transparent",
+                border: isToday && !isSelected ? `1.5px solid ${COLORS.accentSoft}` : `1px solid ${isSelected ? COLORS.ink : "transparent"}`,
+              }}>
+              <span className="text-sm" style={{ color: isSelected ? "#FFF" : COLORS.ink }}>{d}</span>
+              {count > 0 && (
+                <span className="w-1.5 h-1.5 rounded-full mt-0.5" style={{ background: isSelected ? "#FFF" : COLORS.accent }} />
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      <p className="text-xs uppercase tracking-wide mb-2" style={{ color: COLORS.accentSoft }}>{formatDateHuman(selectedDay)}</p>
+      {dayAppointments.length === 0 && <p className="text-sm" style={{ color: COLORS.muted }}>No hay citas este día.</p>}
+      <div className="space-y-2">
+        {dayAppointments.map((a) => (
+          <div key={a.id} className="p-3 rounded-xl text-sm flex items-center justify-between gap-3" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+            <div>
+              <span>{a.time} · {a.name}</span>
+              <span className="block" style={{ color: COLORS.muted }}>{a.serviceName}</span>
             </div>
+            <button onClick={() => cancelAppointment(a)} className="text-xs underline flex-shrink-0" style={{ color: COLORS.accentDark }}>
+              Cancelar
+            </button>
           </div>
         ))}
       </div>
