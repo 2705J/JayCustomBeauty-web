@@ -86,6 +86,7 @@ const DEFAULT_PROFILE = {
   aboutPhoto: null,
   aboutText: "",
   rules: "",
+  monthlyPhrase: "",
 };
 
 const SLOT_MINUTES = 45;
@@ -593,7 +594,7 @@ function ClientView({ profile, services, reviews, faqs, onSubmit, onGiftCardRequ
       {mode === "booking" && (
         <div className="max-w-2xl mx-auto px-6 pt-10 pb-20">
           <BackButton onClick={() => setMode("menu")} />
-          <BookingFlow services={services} slotsForDate={slotsForDate} allSlotsForDate={allSlotsForDate} datesWithHours={datesWithHours} onSubmit={onSubmit} />
+          <BookingFlow profile={profile} services={services} slotsForDate={slotsForDate} allSlotsForDate={allSlotsForDate} datesWithHours={datesWithHours} onSubmit={onSubmit} />
         </div>
       )}
 
@@ -709,7 +710,7 @@ function BackButton({ onClick }) {
   );
 }
 
-function BookingFlow({ services, slotsForDate, allSlotsForDate, datesWithHours, onSubmit }) {
+function BookingFlow({ profile, services, slotsForDate, allSlotsForDate, datesWithHours, onSubmit }) {
   const [selectedService, setSelectedService] = useState(null);
   const [extraIds, setExtraIds] = useState([]);
   const [form, setForm] = useState({ name: "", phone: "", email: "", date: "", time: "" });
@@ -850,6 +851,9 @@ function BookingFlow({ services, slotsForDate, allSlotsForDate, datesWithHours, 
               onSelectDate={(d) => setForm({ ...form, date: d, time: "" })}
               datesWithHours={datesWithHours}
             />
+            {profile?.monthlyPhrase && (
+              <p className="hero-font italic text-lg mt-4 text-center" style={{ color: COLORS.accentSoft }}>"{profile.monthlyPhrase}"</p>
+            )}
           </div>
 
           {form.date && (
@@ -1443,6 +1447,9 @@ function SalonTab({ profile, setProfile }) {
         <Field label="Correo de contacto"><input type="email" value={local.email || ""} onChange={(e) => setLocal({ ...local, email: e.target.value })} className="jcb-input" /></Field>
         <Field label="Normas del establecimiento y forma de pago (aparece en el correo de confirmación)">
           <textarea value={local.rules || ""} onChange={(e) => setLocal({ ...local, rules: e.target.value })} className="jcb-input" rows={4} placeholder="Ej: Pago en efectivo o Bizum. Si llegas más de 15 min tarde, puede que tengamos que reprogramar." />
+        </Field>
+        <Field label="Frase del mes (aparece junto al calendario de reservas)">
+          <input value={local.monthlyPhrase || ""} onChange={(e) => setLocal({ ...local, monthlyPhrase: e.target.value })} className="jcb-input" placeholder="Ej: Este mes, regálate un poco de ti misma." />
         </Field>
         <div>
           <span className="text-xs uppercase tracking-wide mb-2 block" style={{ color: COLORS.muted }}>Fotos de tus sistemas</span>
