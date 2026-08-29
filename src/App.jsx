@@ -205,7 +205,7 @@ export default function App() {
 
   const blockedRanges = (dateStr) =>
     appointments
-      .filter((a) => a.date === dateStr && a.status !== "rechazada")
+      .filter((a) => a.date === dateStr && a.status !== "rechazada" && a.status !== "cancelada")
       .map((a) => {
         const start = timeToMinutes(a.time);
         return { start, end: start + appointmentDuration(a) };
@@ -224,6 +224,24 @@ export default function App() {
       })
       .sort();
   };
+
+  // Todas las horas configuradas ese día, con si están libres u ocupadas (para el calendario de la clienta)
+  const allSlotsForDate = (dateStr) => {
+    if (!dateStr) return [];
+    if (blockedDates.includes(dateStr)) return [];
+    const conf = availability[dateStr];
+    if (!conf || !conf.times) return [];
+    const ranges = blockedRanges(dateStr);
+    return conf.times
+      .map((t) => {
+        const m = timeToMinutes(t);
+        const available = !ranges.some((r) => m >= r.start && m < r.end);
+        return { time: t, available };
+      })
+      .sort((a, b) => a.time.localeCompare(b.time));
+  };
+
+  const datesWithHours = Object.keys(availability).filter((d) => (availability[d]?.times || []).length > 0 && !blockedDates.includes(d));
 
   if (!loaded) {
     return (
@@ -254,6 +272,8 @@ export default function App() {
             reviews={reviews}
             faqs={faqs}
             slotsForDate={slotsForDate}
+            allSlotsForDate={allSlotsForDate}
+            datesWithHours={datesWithHours}
             mode={clientMode}
             setMode={setClientMode}
             onSubmit={async (appt) => {
@@ -392,7 +412,7 @@ function SiteFooter({ profile, setMode }) {
 
 const TRUST_PHRASES = ["✨ Servicio profesional", "🧴 Materiales de calidad", "📅 Citas a tu medida"];
 
-function ClientView({ profile, services, reviews, faqs, onSubmit, onGiftCardRequest, mode, setMode, slotsForDate }) {
+function ClientView({ profile, services, reviews, faqs, onSubmit, onGiftCardRequest, mode, setMode, slotsForDate, allSlotsForDate, datesWithHours }) {
   const [viewingService, setViewingService] = useState(null);
   const avgRating = reviews.length ? (reviews.reduce((a, r) => a + r.rating, 0) / reviews.length).toFixed(1) : null;
   const heroImage = profile.photos[0] || services.find((s) => s.photo)?.photo || DEMO_NAIL_PHOTOS[0];
@@ -573,7 +593,7 @@ function ClientView({ profile, services, reviews, faqs, onSubmit, onGiftCardRequ
       {mode === "booking" && (
         <div className="max-w-2xl mx-auto px-6 pt-10 pb-20">
           <BackButton onClick={() => setMode("menu")} />
-          <BookingFlow services={services} slotsForDate={slotsForDate} onSubmit={onSubmit} />
+          <BookingFlow services={services} slotsForDate={slotsForDate} allSlotsForDate={allSlotsForDate} datesWithHours={datesWithHours} onSubmit={onSubmit} />
         </div>
       )}
 
@@ -627,6 +647,60 @@ function MiniFaqPreview({ faqs }) {
   );
 }
 
+function ClientCalendar({ selectedDate, onSelectDate, datesWithHours }) {
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const [monthCursor, setMonthCursor] = useState(() => { const d = new Date(); d.setDate(1); return d; });
+  const availableSet = new Set(datesWithHours || []);
+
+  const year = monthCursor.getFullYear();
+  const month = monthCursor.getMonth();
+  const firstOfMonth = new Date(year, month, 1);
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const startOffset = (firstOfMonth.getDay() + 6) % 7;
+
+  const cells = [];
+  for (let i = 0; i < startOffset; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+
+  const dateStrFor = (d) => `${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+  const changeMonth = (delta) => setMonthCursor(new Date(year, month + delta, 1));
+
+  return (
+    <div className="rounded-2xl p-4" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+      <div className="flex items-center justify-between mb-3">
+        <button type="button" onClick={() => changeMonth(-1)} className="w-7 h-7 rounded-full flex items-center justify-center" style={{ background: COLORS.soft, color: COLORS.accentDark }}>‹</button>
+        <p className="service-title text-sm capitalize" style={{ color: COLORS.ink }}>{MONTH_LABELS[month]} {year}</p>
+        <button type="button" onClick={() => changeMonth(1)} className="w-7 h-7 rounded-full flex items-center justify-center" style={{ background: COLORS.soft, color: COLORS.accentDark }}>›</button>
+      </div>
+      <div className="grid grid-cols-7 gap-1 mb-1">
+        {WEEKDAY_LABELS.map((w) => <div key={w} className="text-center text-xs" style={{ color: COLORS.muted }}>{w}</div>)}
+      </div>
+      <div className="grid grid-cols-7 gap-1">
+        {cells.map((d, i) => {
+          if (!d) return <div key={`e-${i}`} />;
+          const dateStr = dateStrFor(d);
+          const hasHours = availableSet.has(dateStr);
+          const isPast = dateStr < todayStr;
+          const selectable = hasHours && !isPast;
+          const isSelected = dateStr === selectedDate;
+          return (
+            <button key={dateStr} type="button" disabled={!selectable} onClick={() => onSelectDate(dateStr)}
+              className="aspect-square rounded-xl flex flex-col items-center justify-center"
+              style={{
+                background: isSelected ? COLORS.ink : selectable ? COLORS.soft : "transparent",
+                opacity: selectable ? 1 : 0.35,
+                cursor: selectable ? "pointer" : "default",
+              }}>
+              <span className="text-sm" style={{ color: isSelected ? "#FFF" : COLORS.ink }}>{d}</span>
+              {hasHours && !isSelected && <span className="w-1.5 h-1.5 rounded-full mt-0.5" style={{ background: COLORS.accent }} />}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function BackButton({ onClick }) {
   return (
     <button onClick={onClick} className="flex items-center gap-1 text-xs mb-6 opacity-70 hover:opacity-100" style={{ color: COLORS.muted }}>
@@ -635,7 +709,7 @@ function BackButton({ onClick }) {
   );
 }
 
-function BookingFlow({ services, slotsForDate, onSubmit }) {
+function BookingFlow({ services, slotsForDate, allSlotsForDate, datesWithHours, onSubmit }) {
   const [selectedService, setSelectedService] = useState(null);
   const [extraIds, setExtraIds] = useState([]);
   const [form, setForm] = useState({ name: "", phone: "", email: "", date: "", time: "" });
@@ -768,23 +842,43 @@ function BookingFlow({ services, slotsForDate, onSubmit }) {
             <Field label="Teléfono"><input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="jcb-input" /></Field>
           </div>
           <Field label="Correo electrónico"><input required type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="jcb-input" /></Field>
-          <div className="grid md:grid-cols-2 gap-4">
-            <Field label="Fecha">
-              <input required type="date" min={new Date().toISOString().slice(0, 10)} value={form.date}
-                onChange={(e) => setForm({ ...form, date: e.target.value, time: "" })} className="jcb-input" />
-            </Field>
-            <Field label="Hora disponible">
-              {form.date ? (
-                slots.length ? (
-                  <select required value={form.time} onChange={(e) => setForm({ ...form, time: e.target.value })} className="jcb-input">
-                    <option value="">Elige una hora</option>
-                    {slots.map((t) => <option key={t} value={t}>{t}</option>)}
-                  </select>
-                ) : <p className="text-sm italic pt-2" style={{ color: COLORS.muted }}>No hay horas disponibles ese día</p>
-              ) : <p className="text-sm italic pt-2" style={{ color: COLORS.muted }}>Elige antes una fecha</p>}
-            </Field>
+
+          <div>
+            <span className="text-xs uppercase tracking-wide mb-2 block" style={{ color: COLORS.muted }}>Elige el día</span>
+            <ClientCalendar
+              selectedDate={form.date}
+              onSelectDate={(d) => setForm({ ...form, date: d, time: "" })}
+              datesWithHours={datesWithHours}
+            />
           </div>
-          <button type="submit" className="w-full py-3 rounded-full display-font text-sm mt-4 transition" style={{ background: COLORS.accent, color: "#FFF" }}>
+
+          {form.date && (
+            <div>
+              <span className="text-xs uppercase tracking-wide mb-2 block" style={{ color: COLORS.muted }}>Horas de {formatDateHuman(form.date)}</span>
+              {allSlotsForDate(form.date).length === 0 ? (
+                <p className="text-sm italic" style={{ color: COLORS.muted }}>No hay horas puestas para este día.</p>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {allSlotsForDate(form.date).map(({ time, available }) => (
+                    <button key={time} type="button" disabled={!available} onClick={() => setForm({ ...form, time })}
+                      className="px-4 py-2 rounded-full text-sm"
+                      style={{
+                        background: form.time === time ? COLORS.ink : available ? COLORS.card : "transparent",
+                        color: form.time === time ? "#FFF" : available ? COLORS.ink : COLORS.muted,
+                        border: `1px solid ${available ? COLORS.border : COLORS.border}`,
+                        opacity: available ? 1 : 0.5,
+                        textDecoration: available ? "none" : "line-through",
+                        cursor: available ? "pointer" : "not-allowed",
+                      }}>
+                      {time}{!available && <span className="ml-1 text-xs">· ocupado</span>}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          <button type="submit" disabled={!form.time} className="w-full py-3 rounded-full display-font text-sm mt-4 transition" style={{ background: COLORS.accent, color: "#FFF", opacity: form.time ? 1 : 0.5 }}>
             Solicitar cita
           </button>
         </form>
