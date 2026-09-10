@@ -227,7 +227,7 @@ export default function App() {
   };
 
   // Todas las horas configuradas ese día, con si están libres u ocupadas (para el calendario de la clienta)
-  const allSlotsForDate = (dateStr) => {
+  const allSlotsForDate = (dateStr, duration) => {
     if (!dateStr) return [];
     if (blockedDates.includes(dateStr)) return [];
     const conf = availability[dateStr];
@@ -236,7 +236,8 @@ export default function App() {
     return conf.times
       .map((t) => {
         const m = timeToMinutes(t);
-        const available = !ranges.some((r) => m >= r.start && m < r.end);
+        const dur = duration || 0;
+        const available = !ranges.some((r) => m < r.end && m + dur > r.start);
         return { time: t, available };
       })
       .sort((a, b) => a.time.localeCompare(b.time));
@@ -859,11 +860,11 @@ function BookingFlow({ profile, services, slotsForDate, allSlotsForDate, datesWi
           {form.date && (
             <div>
               <span className="text-xs uppercase tracking-wide mb-2 block" style={{ color: COLORS.muted }}>Horas de {formatDateHuman(form.date)}</span>
-              {allSlotsForDate(form.date).length === 0 ? (
+              {allSlotsForDate(form.date, totalDuration).length === 0 ? (
                 <p className="text-sm italic" style={{ color: COLORS.muted }}>No hay horas puestas para este día.</p>
               ) : (
                 <div className="flex flex-wrap gap-2">
-                  {allSlotsForDate(form.date).map(({ time, available }) => (
+                  {allSlotsForDate(form.date, totalDuration).map(({ time, available }) => (
                     <button key={time} type="button" disabled={!available} onClick={() => setForm({ ...form, time })}
                       className="px-4 py-2 rounded-full text-sm"
                       style={{
@@ -1184,6 +1185,7 @@ function AgendaTab({ appointments, setAppointments }) {
             <div>
               <span>{a.time} · {a.name}</span>
               <span className="block" style={{ color: COLORS.muted }}>{a.serviceName}</span>
+              <span className="block text-xs" style={{ color: COLORS.muted }}>{a.phone || "sin teléfono"} {a.email && `· ${a.email}`}</span>
             </div>
             <button onClick={() => cancelAppointment(a)} className="text-xs underline flex-shrink-0" style={{ color: COLORS.accentDark }}>
               Cancelar
