@@ -8,6 +8,24 @@ function esNavidad() {
   return (m === 10 && dia >= 13) || m === 11 || (m === 0 && dia <= 6);
 }
 
+function dibujarCopo(ctx, x, y, r, rot) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(rot);
+  ctx.beginPath();
+  for (let i = 0; i < 6; i++) {
+    ctx.rotate(Math.PI / 3);
+    ctx.moveTo(0, 0);
+    ctx.lineTo(0, r);
+    ctx.moveTo(0, r * 0.55);
+    ctx.lineTo(r * 0.28, r * 0.82);
+    ctx.moveTo(0, r * 0.55);
+    ctx.lineTo(-r * 0.28, r * 0.82);
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
 function Banner() {
   return (
     <span className="navidad">
@@ -20,7 +38,7 @@ function Banner() {
       </svg>
       <span className="navidad-texto">
         <span className="navidad-titulo">Especial Navidad</span>
-        <span className="navidad-sub">Gracias por un año increíble, mis amores ✨</span>
+        <span className="navidad-sub">Gracias por un año increíble, mis besties ✨</span>
       </span>
     </span>
   );
@@ -46,28 +64,32 @@ export default function Navidad() {
     resize();
     window.addEventListener("resize", resize);
 
-    const n = window.innerWidth < 600 ? 35 : 70;
+    const n = window.innerWidth < 600 ? 22 : 40;
     const copos = Array.from({ length: n }, () => ({
       x: Math.random() * w,
       y: Math.random() * h,
-      r: Math.random() * 3 + 1,
-      v: Math.random() * 0.8 + 0.4,
+      r: Math.random() * 5 + 4,
+      v: Math.random() * 0.6 + 0.3,
       o: Math.random() * Math.PI * 2,
+      rot: Math.random() * Math.PI,
+      vr: (Math.random() - 0.5) * 0.01,
     }));
+
+    ctx.lineWidth = 1.2;
+    ctx.lineCap = "round";
 
     const loop = (t) => {
       ctx.clearRect(0, 0, w, h);
-      ctx.fillStyle = "rgba(214,55,122,0.35)";
+      ctx.strokeStyle = "rgba(214,55,122,0.55)";
       for (const f of copos) {
         f.y += f.v;
-        f.x += Math.sin(t / 1000 + f.o) * 0.4;
-        if (f.y > h) {
-          f.y = -5;
+        f.x += Math.sin(t / 1000 + f.o) * 0.35;
+        f.rot += f.vr;
+        if (f.y > h + 10) {
+          f.y = -10;
           f.x = Math.random() * w;
         }
-        ctx.beginPath();
-        ctx.arc(f.x, f.y, f.r, 0, 7);
-        ctx.fill();
+        dibujarCopo(ctx, f.x, f.y, f.r, f.rot);
       }
       raf = requestAnimationFrame(loop);
     };
