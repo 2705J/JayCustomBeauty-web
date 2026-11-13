@@ -7,8 +7,6 @@ function esNavidad() {
   return (m === 10 && dia >= 13) || m === 11 || (m === 0 && dia <= 6);
 }
 
-}
-
 export default function Navidad() {
   const canvasRef = useRef(null);
   const activo = esNavidad();
