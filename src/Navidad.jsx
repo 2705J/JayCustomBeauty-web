@@ -7,12 +7,12 @@ function esNavidad() {
   return (m === 10 && dia >= 13) || m === 11 || (m === 0 && dia <= 6);
 }
 
-export default function Navidad() {
+export default function Navidad({ banner = false }) {
   const canvasRef = useRef(null);
   const activo = esNavidad();
 
   useEffect(() => {
-    if (!activo) return;
+    if (!activo || banner) return;
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
 
     const c = canvasRef.current;
@@ -56,19 +56,35 @@ export default function Navidad() {
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", resize);
     };
-  }, [activo]);
+  }, [activo, banner]);
 
   if (!activo) return null;
+
+  if (!banner) {
+    return (
+      <canvas
+        ref={canvasRef}
+        style={{
+          position: "fixed",
+          inset: 0,
+          pointerEvents: "none",
+          zIndex: 50,
+        }}
+      />
+    );
+  }
 
   return (
     <>
       <style>{`
         .navidad {
           display: flex; align-items: center; gap: 10px;
-          margin: 12px 16px; padding: 8px 16px;
+          width: fit-content; max-width: calc(100% - 32px);
+          margin: 12px auto; padding: 8px 16px;
           background: #fff; border: 1px solid #f0c9d9;
           border-radius: 999px;
           box-shadow: 0 4px 14px rgba(210,55,122,.12);
+          text-align: left;
         }
         .navidad .lazo {
           width: 44px; flex-shrink: 0;
@@ -90,16 +106,6 @@ export default function Navidad() {
           .navidad .lazo { animation: none; }
         }
       `}</style>
-
-      <canvas
-        ref={canvasRef}
-        style={{
-          position: "fixed",
-          inset: 0,
-          pointerEvents: "none",
-          zIndex: 50,
-        }}
-      />
 
       <div className="navidad">
         <svg className="lazo" viewBox="0 0 120 90" aria-hidden="true">
