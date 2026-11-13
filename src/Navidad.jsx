@@ -3,7 +3,10 @@ import { useEffect, useRef } from "react";
 function esNavidad() {
   const d = new Date();
   const m = d.getMonth();
-  return m === 11 || (m === 0 && d.getDate() <= 6);
+  const dia = d.getDate();
+  return (m === 10 && dia >= 13) || m === 11 || (m === 0 && dia <= 6);
+}
+
 }
 
 export default function Navidad() {
