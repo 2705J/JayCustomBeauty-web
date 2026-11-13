@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "./supabaseClient.js";
 import emailjs from "@emailjs/browser";
+import Navidad from "./Navidad";
+
 
 // Datos de conexión de EmailJS (públicos, es seguro tenerlos aquí)
 const EMAILJS_PUBLIC_KEY = "dBz5-qPnGZEzQlImV";
