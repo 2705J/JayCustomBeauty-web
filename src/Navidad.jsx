@@ -1,4 +1,5 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 function esNavidad() {
   const d = new Date();
@@ -7,12 +8,32 @@ function esNavidad() {
   return (m === 10 && dia >= 13) || m === 11 || (m === 0 && dia <= 6);
 }
 
-export default function Navidad({ banner = false, fallback = null }) {
+function Banner() {
+  return (
+    <span className="navidad">
+      <svg className="lazo" viewBox="0 0 120 90" aria-hidden="true">
+        <path d="M60 45C30 5 0 15 10 45 18 70 45 62 60 45Z" fill="#d6203a" />
+        <path d="M60 45C90 5 120 15 110 45 102 70 75 62 60 45Z" fill="#d6203a" />
+        <path d="M54 50 36 86l16-8 6-22Z" fill="#b5122b" />
+        <path d="M66 50l18 36-16-8-6-22Z" fill="#b5122b" />
+        <ellipse cx="60" cy="46" rx="10" ry="11" fill="#a50f25" />
+      </svg>
+      <span className="navidad-texto">
+        <span className="navidad-titulo">Especial Navidad</span>
+        <span className="navidad-sub">Gracias por un año increíble, mis amores ✨</span>
+      </span>
+    </span>
+  );
+}
+
+export default function Navidad() {
   const canvasRef = useRef(null);
+  const [slot, setSlot] = useState(null);
   const activo = esNavidad();
 
+  // Nieve
   useEffect(() => {
-    if (!activo || banner) return;
+    if (!activo) return;
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
 
     const c = canvasRef.current;
@@ -56,23 +77,40 @@ export default function Navidad({ banner = false, fallback = null }) {
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", resize);
     };
-  }, [activo, banner]);
+  }, [activo]);
 
-  if (!activo) return banner ? <>{fallback}</> : null;
+  // Sustituye el título de la portada por el banner
+  useEffect(() => {
+    if (!activo) return;
+    let holder = null;
+    let oculto = null;
 
-  if (!banner) {
-    return (
-      <canvas
-        ref={canvasRef}
-        style={{
-          position: "fixed",
-          inset: 0,
-          pointerEvents: "none",
-          zIndex: 50,
-        }}
-      />
-    );
-  }
+    const colocar = () => {
+      const h1 = document.querySelector("h1.hero-font");
+      if (!h1) return;
+      if (h1.dataset.navidad === "1" && holder && holder.isConnected) return;
+      if (holder) holder.remove();
+      h1.dataset.navidad = "1";
+      h1.style.display = "none";
+      oculto = h1;
+      holder = document.createElement("div");
+      holder.style.marginBottom = "1.25rem";
+      h1.insertAdjacentElement("afterend", holder);
+      setSlot(holder);
+    };
+
+    colocar();
+    const obs = new MutationObserver(colocar);
+    obs.observe(document.body, { childList: true, subtree: true });
+
+    return () => {
+      obs.disconnect();
+      if (oculto) oculto.style.display = "";
+      if (holder) holder.remove();
+    };
+  }, [activo]);
+
+  if (!activo) return null;
 
   return (
     <>
@@ -86,6 +124,7 @@ export default function Navidad({ banner = false, fallback = null }) {
           box-shadow: 0 4px 14px rgba(210,55,122,.12);
           text-align: left; font-style: normal;
         }
+        @media (min-width: 768px) { .navidad { margin-left: 0; } }
         .navidad .lazo {
           width: 44px; flex-shrink: 0;
           animation: balanceo 3s ease-in-out infinite;
@@ -107,19 +146,17 @@ export default function Navidad({ banner = false, fallback = null }) {
         }
       `}</style>
 
-      <span className="navidad">
-        <svg className="lazo" viewBox="0 0 120 90" aria-hidden="true">
-          <path d="M60 45C30 5 0 15 10 45 18 70 45 62 60 45Z" fill="#d6203a" />
-          <path d="M60 45C90 5 120 15 110 45 102 70 75 62 60 45Z" fill="#d6203a" />
-          <path d="M54 50 36 86l16-8 6-22Z" fill="#b5122b" />
-          <path d="M66 50l18 36-16-8-6-22Z" fill="#b5122b" />
-          <ellipse cx="60" cy="46" rx="10" ry="11" fill="#a50f25" />
-        </svg>
-        <span className="navidad-texto">
-          <span className="navidad-titulo">Especial Navidad</span>
-          <span className="navidad-sub">Gracias por un año increíble, mis amores ✨</span>
-        </span>
-      </span>
+      <canvas
+        ref={canvasRef}
+        style={{
+          position: "fixed",
+          inset: 0,
+          pointerEvents: "none",
+          zIndex: 50,
+        }}
+      />
+
+      {slot && createPortal(<Banner />, slot)}
     </>
   );
 }
